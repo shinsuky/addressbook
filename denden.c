@@ -1,9 +1,10 @@
 /*	クオリティＣプログラミング　中級編
 **
-**	例題2：
-**		住所録管理表・第2版
+**	例題３：
+**		住所録管理表・第3版
 **
-**		file name：	denden2.c
+**		file name：	denden3.c
+**
 **		コンパイルする場合、ライブラリのリンクオプション　-lncurses をつけること
 **
 **		composed by Naohiko Takeda
@@ -24,6 +25,7 @@
 #include	<ctype.h>
 #include	<ncurses.h>
 #include 	<locale.h>
+#include	<string.h>
 #include  <stdlib.h>
 
 /*---------------------*/
@@ -53,9 +55,11 @@
 
 /* コマンドの定義 */
 
-#define		CMD_MAX				8		/* 第2版 */
+#define		CMD_MAX				10		/* 第3版 */
 
 #define		APPEND				'A'		/* データの追加 */
+#define		EDIT				'E'		/* データの編集 */
+#define		DELETE				'X'		/* データの削除 */
 #define		BEFORE				'B'		/* 前のデータへ */
 #define		NEXT				'N'		/* 次のデータへ */
 #define		UP_PAGE				'U'		/* 前ページへ */
@@ -66,6 +70,8 @@
 
 char	cmd_list[] = {
 			APPEND,
+			EDIT,
+			DELETE,
 			BEFORE,
 			NEXT,
 			UP_PAGE,
@@ -101,12 +107,15 @@ void	exec_cmd( char cmd );
 
 /* 住所録管理コマンド */
 void	data_append( void );
+void	data_edit( void );
+void	data_delete( void );
 void	paging( int direction );
 void	cur_move( int direction );
 void	data_load( void );
 void	data_save( void );
+void	pack_data( int *rec_no, int *tail );
 
-void	init_buff();
+void  init_buff();
 
 /* 画面表示用部品 */
 void	init_disp( void );
@@ -150,7 +159,7 @@ int	main()
 #define		CMD_ERR_LINE	MSG_LINE+1
 #define		CMD_LINE		MSG_LINE+2
 
-#define		CMD_MSG			"コマンド(A:追加 B:前 N:後 U:次頁 D:前頁 L:ロード S:セーブ Q:終了)"
+#define		CMD_MSG			"コマンド(A:追加 E:編集 X:削除 B:前 N:後 U:次頁 D:前頁 L:ロード S:セーブ Q:終了)"
 #define		CMD_ERR_MSG		"不適当なコマンドでした"
 #define		CMD_PROMPT		" >>"
 
@@ -174,12 +183,12 @@ char	input_cmd()
 	char	buffer[BUFFER_LEN];
 
 	/* 前処理 */
-	move(CMD_MSG_LINE, 1);
+	move( CMD_MSG_LINE, 1 );
 	printw( CMD_MSG );
 
 	/* コマンドの入力 */
 	for( ; ; ){
-		move(CMD_LINE, 1);	/* コマンドを1文字入力する */
+		move( CMD_LINE, 1 );	/* コマンドを1文字入力する */
 		clrtoeol();
 		printw( CMD_PROMPT );
 		getstr( buffer );
@@ -191,7 +200,7 @@ char	input_cmd()
 			}
 		}
 		if( !match ){
-			move(CMD_ERR_LINE, 1);
+			move( CMD_ERR_LINE, 1 );
 			printw( CMD_ERR_MSG );
 		} else {
 			break;
@@ -221,6 +230,12 @@ void exec_cmd(
 	switch( cmd ){
 	case	APPEND:
 		data_append();		/* 追加 */
+		break;
+	case	EDIT:
+		data_edit();		/* データの編集 */
+		break;
+	case	DELETE:
+		data_delete();		/* データの削除 */
 		break;
 	case	UP_PAGE:
 		paging( UP );		/* 次ページ */
@@ -252,6 +267,14 @@ void exec_cmd(
 #define		APPEND_LINE		MSG_LINE
 #define		APPEND_END_LINE	MSG_LINE+4
 
+#define		EDIT_MSG	"編集する項目を選んでください  N:名前 F:フリガナ A:住所 Z:郵便番号 T:電話 Q:終了"
+
+#define		NAME		'N'
+#define		KANA_NAME	'F'
+#define		ADDR		'A'
+#define		ZIP_NO		'Z'
+#define		TELPHONE	'T'
+
 #define		FBUF_MAX		200
 
 #define		ERR_APPEND		"データが一杯で，もう追加できません．"
@@ -274,7 +297,7 @@ void	data_append( void )
 {
 	int		i;
 
-	move(APPEND_LINE, 1);
+	move( APPEND_LINE, 1 );
 
 	/* データが一杯かどうか調べる */
 	if( rec_qty >= RECORD_MAX ){
@@ -298,6 +321,99 @@ void	data_append( void )
 
 	/* 後始末 */
 	del_lines( APPEND_LINE, APPEND_END_LINE );
+}
+
+
+/* data_edit */
+/*----------------------------------------------------*/
+/*
+	書式：	void	data_edit( void )
+
+	機能：	注目行のあるレコードに対して，編集作業を行う．
+			まず，レコードのどの項目を修正するか入力する．
+			入力された項目について，入力プロンプトを出力し，全部入力しなおす．
+			もとのデータの一部分のみ，修正，変更，削除などは，サポートしない．
+			編集項目の選択のところで，終了を選択すると，画面上の注目行のみ，再表
+			示し，編集を終了する．
+
+	返値：	なし
+*/
+
+void	data_edit( void )
+{
+	int	disp_pos;		/* 注目行の表示位置 */
+	int	c;
+	char	buffer[BUFFER_LEN];
+
+	if( cursor == 0 )	/* データがない時の処理 */
+		return;
+
+	for( ; ; ){
+		move( MSG_LINE, 1 );	/* 編集項目の選択 */
+		printw( EDIT_MSG );
+		move( MSG_LINE+2, 1 );
+		printw( ">>" );
+		getstr(buffer);
+		if(( c = toupper( buffer[0] )) == QUIT )
+			break;
+
+		/* 各項目の編集 */
+		switch( c ){
+		case	NAME:
+			printw("\n名前	>>");
+			getnstr( j_name[cursor-1], NAME_LEN );
+			break;
+		case	KANA_NAME:
+			printw("\nフリガナ	>>");
+			getnstr( k_name[cursor-1], NAME_LEN );
+			break;
+		case	ADDR:
+			printw("\n住所	>>");
+			getnstr( address[cursor-1], ADDR_LEN );
+			break;
+		case	ZIP_NO:
+			printw("\n郵便番号	>>");
+			getnstr( zip[cursor-1], ZIP_LEN );
+			break;
+		case	TELPHONE:
+			printw("\n電話番号	>>");
+			getnstr( tel_no[cursor-1], TEL_LEN );
+			break;
+		default:
+			break;
+		}
+		/* 注目行の再表示 */
+		disp_pos = DATA_LINE + (( cursor-1 )% DISP_REC_MAX)*3;
+		show_record( cursor, disp_pos );
+		del_lines( MSG_LINE+2, MSG_LINE+4 );
+	}
+	del_lines( MSG_LINE, MSG_LINE+4 );
+}
+
+
+/* data_delete */
+/*----------------------------------------------------*/
+/*
+	書式：	void	data_delete( void )
+
+	機能：	注目行のデータを削除し，空いたところを詰め合わせる．
+
+	返値：	なし
+*/
+
+void data_delete()
+{
+	/* データ無しのチェック */
+	if( cursor <= 0 )
+		return;
+
+	/* 注目行の削除 */
+	pack_data( &cursor, &rec_qty );	/* まず，データの詰め合わせ */
+	k_name[rec_qty][0] = '\0';	/* 末尾データの削除 */
+	j_name[rec_qty][0] = '\0';
+	zip[rec_qty][0] = '\0';
+	address[rec_qty][0] = '\0';
+	tel_no[rec_qty][0] = '\0';
 }
 
 
@@ -391,10 +507,11 @@ void	data_load( void )
 	FILE	*fp;
 	wchar_t   name[NAME_LEN], kana[NAME_LEN], zip_tmp[ZIP_LEN], addr_tmp[ADDR_LEN], tel_tmp[TEL_LEN];
 
+
 	/* ファイル名の入力 */
-	move(MSG_LINE, 1);
+	move( MSG_LINE, 1 );
 	printw("ファイルをロードします");
-	move(CMD_LINE, 1);
+	move( CMD_LINE, 1 );
 	printw("ファイル名を入力してください >>");
 	getstr( data_file );
 
@@ -446,9 +563,9 @@ void	data_save( void )
 	FILE	*fp;
 
 	/* ファイル名の入力 */
-	move(MSG_LINE, 1);
+	move( MSG_LINE, 1 );
 	printw("ファイルをセーブします");
-	move(CMD_LINE, 1);
+	move( CMD_LINE, 1 );
 	printw("ファイル名を入力してください >>" );
 	getstr( data_file );
 
@@ -466,6 +583,41 @@ void	data_save( void )
 	/* 後始末 */
 	fclose( fp );
 	del_lines( MSG_LINE, CMD_LINE+1 );
+}
+
+
+/* pack_data */
+/*----------------------------------------------------*/
+/*
+	書式：	void	pack_data( int *rec_no, int *tail )
+
+	機能：	指定されたレコード番号より後ろのデータを，前に詰め合わせる．指定した
+			レコード番号のデータは，失われる．詰め合わせる最後のレコード番号も
+			引数で指定する．
+
+	返値：	なし
+*/
+
+void	pack_data(
+	int		*rec_no,	/* 詰め合わせる最初のレコード番号 */
+	int		*tail		/* 詰め合わせる最後のレコード番号 */
+)
+{
+	int		i;
+
+	if( *rec_no == *tail ){	/* 一番最後の要素を消す時 */
+		*rec_no = *rec_no - 1;
+		*tail = *tail - 1;
+		return;
+	}
+	for( i = *rec_no - 1; i < *tail; i++ ){
+		strcpy( j_name[i], j_name[i+1] );
+		strcpy( k_name[i], k_name[i+1] );
+		strcpy( tel_no[i], tel_no[i+1] );
+		strcpy( zip[i], zip[i+1] );
+		strcpy( address[i], address[i+1] );
+	}
+	*tail = *tail - 1;
 }
 
 
@@ -541,8 +693,8 @@ void init_disp( void )
 	setlocale(LC_ALL,"");			//  for UTF-8 setting
 	initscr();								//  画面初期化
 	clear();
-	move(TITLE_LINE, TITLE_POS);
-	printw( "住所管理表    第二版\n%s", LINE);
+	move( TITLE_LINE, TITLE_POS );
+	printw( "住所管理表    第三版\n%s", LINE);
 }
 
 
@@ -565,7 +717,7 @@ void show_one_page( void )
 
 	/* 前処理 */
 	for( i = DATA_START ; i<= DATA_END ; i++ ){
-		move(i, 1);
+		move( i, 1 );
 		clrtoeol();
 	}
 	start = ((( cursor -1 ) / 5)*5 + 1);
@@ -591,7 +743,7 @@ void	show_record(
 {
 	int idx;
 
-	move(pos, 1);
+	move( pos, 1 );
 
 	/* 注目マークをつける */
 	if( num == cursor )
@@ -622,7 +774,7 @@ int		start, end;
 {
 	int		i;
 
-	move(start, 1);
+	move( start, 1 );
 	for( i = start ; i <= end; i++ ){
 		clrtoeol();
 		addch( '\n' );
