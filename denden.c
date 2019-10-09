@@ -1,9 +1,9 @@
 /*	クオリティＣプログラミング　中級編
 **
-**	例題３：
-**		住所録管理表・第3版
+**	例題４：
+**		住所録管理表・第4版
 **
-**		file name：	denden3.c
+**		file name：	denden4.c
 **
 **		コンパイルする場合、ライブラリのリンクオプション　-lncurses をつけること
 **
@@ -55,7 +55,7 @@
 
 /* コマンドの定義 */
 
-#define		CMD_MAX				10		/* 第3版 */
+#define		CMD_MAX				10		/* 第4版 */
 
 #define		APPEND				'A'		/* データの追加 */
 #define		EDIT				'E'		/* データの編集 */
@@ -89,11 +89,15 @@ char	cmd_list[] = {
 int		cursor = 0;						/* 注目行 */
 int		rec_qty = 0;					/* データの数 */
 
-char	j_name[RECORD_MAX][NAME_LEN];	/* 名前（漢字） */
-char	k_name[RECORD_MAX][NAME_LEN];	/* 名前（フリガナ） */
-char	address[RECORD_MAX][ADDR_LEN];	/* 住所 */
-char	tel_no[RECORD_MAX][TEL_LEN];	/* 電話番号 */
-char	zip[RECORD_MAX][ZIP_LEN];		/* 郵便番号 */
+typedef	struct {
+	char	j_name[NAME_LEN];	/* 名前（漢字） */
+	char	k_name[NAME_LEN];	/* 名前（フリガナ） */
+	char	address[ADDR_LEN];	/* 住所 */
+	char	tel_no[TEL_LEN];	/* 電話番号 */
+	char	zip[ZIP_LEN];		/* 郵便番号 */
+}	CARD;
+
+CARD	note[RECORD_MAX];
 
 char	data_file[FNAME_MAX];			/* データファイル名 */
 
@@ -222,7 +226,6 @@ char	input_cmd()
 
 	返値：	なし
 */
-
 void exec_cmd(
 	char	cmd		/* コマンド */
 )
@@ -307,15 +310,15 @@ void	data_append( void )
 
 	/* データを入力する */
 	printw( "名前		>>" );
-	getnstr( j_name[rec_qty], NAME_LEN );
+	getnstr( note[rec_qty].j_name, NAME_LEN );
 	printw( "フリガナ	>>" );
-	getnstr( k_name[rec_qty], NAME_LEN );
+	getnstr( note[rec_qty].k_name, NAME_LEN );
 	printw( "住所		>>" );
-	getnstr( address[rec_qty], ADDR_LEN );
+	getnstr( note[rec_qty].address, ADDR_LEN );
 	printw( "郵便番号	>>" );
-	getnstr( zip[rec_qty], ZIP_LEN );
+	getnstr( note[rec_qty].zip, ZIP_LEN );
 	printw( "電話番号	>>" );
-	getnstr( tel_no[rec_qty], TEL_LEN );
+	getnstr( note[rec_qty].tel_no, TEL_LEN );
 
 	cursor = ++rec_qty;
 
@@ -361,23 +364,23 @@ void	data_edit( void )
 		switch( c ){
 		case	NAME:
 			printw("\n名前	>>");
-			getnstr( j_name[cursor-1], NAME_LEN );
+			getnstr( note[cursor-1].j_name, NAME_LEN );
 			break;
 		case	KANA_NAME:
 			printw("\nフリガナ	>>");
-			getnstr( k_name[cursor-1], NAME_LEN );
+			getnstr( note[cursor-1].k_name, NAME_LEN );
 			break;
 		case	ADDR:
 			printw("\n住所	>>");
-			getnstr( address[cursor-1], ADDR_LEN );
+			getnstr( note[cursor-1].address, ADDR_LEN );
 			break;
 		case	ZIP_NO:
 			printw("\n郵便番号	>>");
-			getnstr( zip[cursor-1], ZIP_LEN );
+			getnstr( note[cursor-1].zip, ZIP_LEN );
 			break;
 		case	TELPHONE:
 			printw("\n電話番号	>>");
-			getnstr( tel_no[cursor-1], TEL_LEN );
+			getnstr( note[cursor-1].tel_no, TEL_LEN );
 			break;
 		default:
 			break;
@@ -403,17 +406,20 @@ void	data_edit( void )
 
 void data_delete()
 {
+	CARD	*tmp;
+
 	/* データ無しのチェック */
 	if( cursor <= 0 )
 		return;
 
 	/* 注目行の削除 */
 	pack_data( &cursor, &rec_qty );	/* まず，データの詰め合わせ */
-	k_name[rec_qty][0] = '\0';	/* 末尾データの削除 */
-	j_name[rec_qty][0] = '\0';
-	zip[rec_qty][0] = '\0';
-	address[rec_qty][0] = '\0';
-	tel_no[rec_qty][0] = '\0';
+	tmp = &note[rec_qty];
+	tmp->k_name[0] = '\0';	/* 末尾データの削除 */
+	tmp->j_name[0] = '\0';
+	tmp->zip[0] = '\0';
+	tmp->address[0] = '\0';
+	tmp->tel_no[0] = '\0';
 }
 
 
@@ -507,7 +513,6 @@ void	data_load( void )
 	FILE	*fp;
 	wchar_t   name[NAME_LEN], kana[NAME_LEN], zip_tmp[ZIP_LEN], addr_tmp[ADDR_LEN], tel_tmp[TEL_LEN];
 
-
 	/* ファイル名の入力 */
 	move( MSG_LINE, 1 );
 	printw("ファイルをロードします");
@@ -525,17 +530,17 @@ void	data_load( void )
 	printw("ロード中");
 	while( fgets( buffer, FBUF_MAX, fp ) != NULL ){
 		addch('*');
-		//sscanf( buffer, "%s %s %s %s %s", j_name[rec_qty], k_name[rec_qty], zip[rec_qty], address[rec_qty], tel_no[rec_qty] );
+		//sscanf( buffer, "%s %s %s %s %s", note[rec_qty].j_name, note[rec_qty].k_name, note[rec_qty].zip, note[rec_qty].address, note[rec_qty].tel_no );
 		//
 		//  元は上記のコードだけだったが、UTF-8 を扱う場合に、char で読み込むと、
 		//  文字によってスペースと誤って認識されてしまうケースで文字化けが起こっていた。
 		//  その問題に対処するため、ワイド文字列で読み込み、マルチバイト文字に変換して記録することとした。
 		sscanf( buffer, "%S %S %S %S %S", name, kana, zip_tmp, addr_tmp, tel_tmp );
-		wcstombs(j_name[rec_qty], name, sizeof(name));
-		wcstombs(k_name[rec_qty], kana, sizeof(kana));
-		wcstombs(zip[rec_qty], zip_tmp, sizeof(zip_tmp));
-		wcstombs(address[rec_qty], addr_tmp, sizeof(addr_tmp));
-		wcstombs(tel_no[rec_qty], tel_tmp, sizeof(tel_tmp));
+		wcstombs(note[rec_qty].j_name, name, sizeof(name));
+		wcstombs(note[rec_qty].k_name, kana, sizeof(kana));
+		wcstombs(note[rec_qty].zip, zip_tmp, sizeof(zip_tmp));
+		wcstombs(note[rec_qty].address, addr_tmp, sizeof(addr_tmp));
+		wcstombs(note[rec_qty].tel_no, tel_tmp, sizeof(tel_tmp));
 
 		rec_qty++;
 	}
@@ -577,7 +582,7 @@ void	data_save( void )
 	end = rec_qty-1;
 	printw("セーブ中");
 	for( i=0 ; i<=end ; i++ ){
-		fprintf( fp, "%s %s %s %s %s\n", j_name[i], k_name[i], zip[i], address[i], tel_no[i] );
+		fprintf( fp, "%s %s %s %s %s\n", note[i].j_name, note[i].k_name, note[i].zip, note[i].address, note[i].tel_no );
 	}
 
 	/* 後始末 */
@@ -611,11 +616,11 @@ void	pack_data(
 		return;
 	}
 	for( i = *rec_no - 1; i < *tail; i++ ){
-		strcpy( j_name[i], j_name[i+1] );
-		strcpy( k_name[i], k_name[i+1] );
-		strcpy( tel_no[i], tel_no[i+1] );
-		strcpy( zip[i], zip[i+1] );
-		strcpy( address[i], address[i+1] );
+		strcpy( note[i].j_name, note[i+1].j_name );
+		strcpy( note[i].k_name, note[i+1].k_name );
+		strcpy( note[i].tel_no, note[i+1].tel_no );
+		strcpy( note[i].zip, note[i+1].zip );
+		strcpy( note[i].address, note[i+1].address );
 	}
 	*tail = *tail - 1;
 }
@@ -656,14 +661,16 @@ void	disp_err(
 
 void	init_buff()
 {
+	CARD	*tmp;
 	int i;
 	//  住所録データの初期化
 	for (i = 0; i < RECORD_MAX; i++) {
-		k_name[i][0] = '\0';
-		j_name[i][0] = '\0';
-		zip[i][0] = '\0';
-		address[i][0] = '\0';
-		tel_no[i][0] = '\0';
+		tmp = &note[i];
+		tmp->k_name[0] = '\0';
+		tmp->j_name[0] = '\0';
+		tmp->zip[0] = '\0';
+		tmp->address[0] = '\0';
+		tmp->tel_no[0] = '\0';
 	}
 }
 
@@ -694,7 +701,7 @@ void init_disp( void )
 	initscr();								//  画面初期化
 	clear();
 	move( TITLE_LINE, TITLE_POS );
-	printw( "住所管理表    第三版\n%s", LINE);
+	printw( "住所管理表    第四版\n%s", LINE);
 }
 
 
@@ -752,8 +759,8 @@ void	show_record(
 		printw( " " );
 
 	idx = num-1;
-	printw("%3d %-20s ℡ %-15s \n" ,num, j_name[idx], tel_no[idx] );
-	printw("     %-20s 〒%-8s %s\n", k_name[idx], zip[idx], address[idx] );
+	printw("%3d %-20s ℡ %-15s \n" ,num, note[idx].j_name, note[idx].tel_no );
+	printw("     %-20s 〒%-8s %s\n", note[idx].k_name, note[idx].zip, note[idx].address );
 	printw( "%s", LINE );
 }
 
