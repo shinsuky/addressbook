@@ -1,7 +1,7 @@
 # プログラム名、ソースコードファイル名、リンクライブラリを指定
 # この部分を修正すればほかは修正をしなくても基本的には使える
 PROGRAM = denden
-SRC = denden.c display.c
+SRC = denden.c display.c fileio.c addr.c
 OBJ = $(SRC:%.c=%.o)
 LNK = -lncurses
 
