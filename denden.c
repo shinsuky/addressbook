@@ -1,73 +1,26 @@
 /*	クオリティＣプログラミング　中級編
 **
-**	例題４：
-**		住所録管理表・第4版
+**	例題：
+**		住所録管理表・第5版
 **
-**		file name：	denden4.c
+**		file name：	denden.c
 **
-**		コンパイルする場合、ライブラリのリンクオプション　-lncurses をつけること
+**		コンパイルする場合、ライブラリのリンクオプション　-lncursesw をつけること
 **
 **		composed by Naohiko Takeda
 **					ver. 1.00.	1990.5.30.
 **		composed by Yoshihide Chubachi
 **					ver. 1.10.	2003.4.27.
 **		composed by Shinsuke Kobayashi
-**					ver. 2.00.	2019.4.11.
+**					ver. 2.10.	2019.10.09.
 **
 */
+#define GLOBAL_VALUE_DEFINE
+#include "denden.h"
 
-
-/*-----------------------------*/
-/*	ヘッダーファイルの読み込み */
-/*-----------------------------*/
-
-#include	<stdio.h>
-#include	<ctype.h>
-#include	<ncurses.h>
-#include 	<locale.h>
-#include	<string.h>
-#include  <stdlib.h>
-
-/*---------------------*/
-/*	システム定数の宣言 */
-/*---------------------*/
-
-#define		TRUE				1
-#define		FALSE				0
-
-#define		BUFFER_LEN			80		/* 入力バッファの文字数 */
-
-#define		RECORD_MAX			20		/* 最大データ件数 */
-#define		NAME_LEN			40		/* 名前の文字数 */
-#define		ADDR_LEN			60		/* 住所の文字数 */
-#define		TEL_LEN				15		/* 電話番号の文字数 */
-#define		ZIP_LEN				9		/* 郵便番号の文字数 */
-
-#define		TITLE_LINE			1		/* タイトル行の位置 */
-#define		DATA_LINE			3		/* データ表示行の先頭位置 */
-#define		DISP_REC_MAX		5		/* 1ページに書くデータ件数 */
-#define		MSG_LINE			18		/* メッセージ行の先頭位置 */
-
-#define		UP					1		/* 前ページ */
-#define		DOWN				0		/* 次ページ */
-
-#define		FNAME_MAX			128		/* ファイル名の最大長さ */
-
-/* コマンドの定義 */
-
-#define		CMD_MAX				10		/* 第4版 */
-
-#define		APPEND				'A'		/* データの追加 */
-#define		EDIT				'E'		/* データの編集 */
-#define		DELETE				'X'		/* データの削除 */
-#define		BEFORE				'B'		/* 前のデータへ */
-#define		NEXT				'N'		/* 次のデータへ */
-#define		UP_PAGE				'U'		/* 前ページへ */
-#define		DOWN_PAGE			'D'		/* 次ページへ */
-#define		LOAD				'L'		/* データのロード */
-#define		SAVE				'S'		/* データのセーブ */
-#define		QUIT				'Q'		/* 終了 */
-
+/*-----------------------*/
+/*	グローバル変数の宣言 */
+/*-----------------------*/
 char	cmd_list[] = {
 			APPEND,
 			EDIT,
@@ -80,54 +33,6 @@ char	cmd_list[] = {
 			SAVE,
 			QUIT
 		};
-
-
-/*-----------------------*/
-/*	グローバル変数の宣言 */
-/*-----------------------*/
-
-int		cursor = 0;						/* 注目行 */
-int		rec_qty = 0;					/* データの数 */
-
-typedef	struct {
-	char	j_name[NAME_LEN];	/* 名前（漢字） */
-	char	k_name[NAME_LEN];	/* 名前（フリガナ） */
-	char	address[ADDR_LEN];	/* 住所 */
-	char	tel_no[TEL_LEN];	/* 電話番号 */
-	char	zip[ZIP_LEN];		/* 郵便番号 */
-}	CARD;
-
-CARD	note[RECORD_MAX];
-
-char	data_file[FNAME_MAX];			/* データファイル名 */
-
-/*---------------------*/
-/*	使用する関数の宣言 */
-/*---------------------*/
-
-/* コマンド処理用部品 */
-char	input_cmd( void );
-void	exec_cmd( char cmd );
-
-/* 住所録管理コマンド */
-void	data_append( void );
-void	data_edit( void );
-void	data_delete( void );
-void	paging( int direction );
-void	cur_move( int direction );
-void	data_load( void );
-void	data_save( void );
-void	pack_data( int *rec_no, int *tail );
-
-void  init_buff();
-
-/* 画面表示用部品 */
-void	init_disp( void );
-void	show_one_page( void );
-void	show_record( int num, int pos );
-void	del_lines( int start, int end );
-void	disp_err( char *msg );
-
 
 /* main */
 /*----------------------------------------------------*/
@@ -153,20 +58,6 @@ int	main()
 	endwin();
 	return 0;
 }
-
-
-/*---------------------*/
-/*	コマンド処理用部品 */
-/*---------------------*/
-
-#define		CMD_MSG_LINE	MSG_LINE
-#define		CMD_ERR_LINE	MSG_LINE+1
-#define		CMD_LINE		MSG_LINE+2
-
-#define		CMD_MSG			"コマンド(A:追加 E:編集 X:削除 B:前 N:後 U:次頁 D:前頁 L:ロード S:セーブ Q:終了)"
-#define		CMD_ERR_MSG		"不適当なコマンドでした"
-#define		CMD_PROMPT		" >>"
-
 
 /* input_cmd */
 /*----------------------------------------------------*/
@@ -267,25 +158,6 @@ void exec_cmd(
 /*	住所録管理コマンド群 */
 /*-----------------------*/
 
-#define		APPEND_LINE		MSG_LINE
-#define		APPEND_END_LINE	MSG_LINE+4
-
-#define		EDIT_MSG	"編集する項目を選んでください  N:名前 F:フリガナ A:住所 Z:郵便番号 T:電話 Q:終了"
-
-#define		NAME		'N'
-#define		KANA_NAME	'F'
-#define		ADDR		'A'
-#define		ZIP_NO		'Z'
-#define		TELPHONE	'T'
-
-#define		FBUF_MAX		200
-
-#define		ERR_APPEND		"データが一杯で，もう追加できません．"
-#define		ERR_FILE		"ファイルがオープンできません．"
-
-#define		WAIT_MSG		"確認したら，好きなキーを押して下さい"
-
-
 /* data_append */
 /*----------------------------------------------------*/
 /*
@@ -298,8 +170,6 @@ void exec_cmd(
 
 void	data_append( void )
 {
-	int		i;
-
 	move( APPEND_LINE, 1 );
 
 	/* データが一杯かどうか調べる */
@@ -437,7 +307,7 @@ void paging(
 	int	direction	/* ページングの方向 */
 )
 {
-	int next;
+	int next = 0;
 
 	if(rec_qty == 0)	/* データなし */
 		return;
@@ -474,7 +344,7 @@ void	cur_move(
 	int	direction	/* 注目行の移動方向 */
 )
 {
-	int		next;
+	int		next = 0;
 
 	if( rec_qty == 0 )	/* データなし */
 		return;
@@ -626,29 +496,6 @@ void	pack_data(
 }
 
 
-/* disp_err */
-/*----------------------------------------------------*/
-/*
-	書式：	void	disp_err( char *msg )
-
-	機能：	引数で渡されたエラーメッセージを表示し，なにかキーが押されるまで待つ．
-			キーが押されたら，画面のメッセージ領域をクリアし，戻る．
-
-	返値：	なし
-*/
-
-void	disp_err(
-	char	*msg /* エラーメッセージ */
-)
-{
-	char	buffer[BUFFER_LEN];
-
-	printw( msg );
-	printw( WAIT_MSG );
-	getstr( buffer );
-	del_lines( APPEND_LINE, APPEND_END_LINE );
-}
-
 /* init_buff */
 /*----------------------------------------------------*/
 /*
@@ -671,119 +518,5 @@ void	init_buff()
 		tmp->zip[0] = '\0';
 		tmp->address[0] = '\0';
 		tmp->tel_no[0] = '\0';
-	}
-}
-
-/*-----------------*/
-/*	画面表示用部品 */
-/*-----------------*/
-
-#define		LINE		"----------------------------------------------------------------"
-
-#define		TITLE_POS	25
-
-#define		DATA_START	DATA_LINE		/* データ領域の開始行 */
-#define		DATA_END	MSG_LINE-1		/* データ領域の最終行 */
-#define		DATA_STEP	3				/* データの間隔 */
-
-
-/* init_disp */
-/*----------------------------------------------------*/
-/*
-	書式：	void	init_disp( void )
-
-	機能：	画面を消去し，第1行目にタイトルを書いておく
-*/
-
-void init_disp( void )
-{
-	setlocale(LC_ALL,"");			//  for UTF-8 setting
-	initscr();								//  画面初期化
-	clear();
-	move( TITLE_LINE, TITLE_POS );
-	printw( "住所管理表    第四版\n%s", LINE);
-}
-
-
-/* show_one_page */
-/*----------------------------------------------------*/
-/*
-	書式：	void	show_one_page( void )
-
-	機能：	1ページ分の住所録データを一画面に書く．
-			1ページには，5件分のデータを書く．
-
-*/
-
-void show_one_page( void )
-{
-	int	start, end,				/* 表示開始，終了レコード番号 */
-		rec_number,				/* 表示するレコード番号 */
-		line_pos = DATA_START;	/* 表示位置 */
-	int	i;
-
-	/* 前処理 */
-	for( i = DATA_START ; i<= DATA_END ; i++ ){
-		move( i, 1 );
-		clrtoeol();
-	}
-	start = ((( cursor -1 ) / 5)*5 + 1);
-	end = start + DISP_REC_MAX -1;
-	if( end > rec_qty )
-		end = rec_qty;
-
-	/* 5件分のデータを書く */
-	for( i = start ; i <= end ; i++ ){
-		show_record( i, line_pos );
-		line_pos += DATA_STEP;
-	}
-}
-
-
-/* show_record */
-/*----------------------------------------------------*/
-
-void	show_record(
-	int	num,	/* 表示したいレコード表号 */
-	int	pos		/* 表示したい行位置 */
-)
-{
-	int idx;
-
-	move( pos, 1 );
-
-	/* 注目マークをつける */
-	if( num == cursor )
-		printw( "*" );
-	else
-		printw( " " );
-
-	idx = num-1;
-	printw("%3d %-20s ℡ %-15s \n" ,num, note[idx].j_name, note[idx].tel_no );
-	printw("     %-20s 〒%-8s %s\n", note[idx].k_name, note[idx].zip, note[idx].address );
-	printw( "%s", LINE );
-}
-
-
-/* del_lines */
-/*----------------------------------------------------*/
-/*
-	書式：	void	del_lines( int start, int end )
-
-	機能：	引数,start,endで指定された行を消す
-
-	返値：	なし
-
-*/
-
-void	del_lines( start, end )
-int		start, end;
-{
-	int		i;
-
-	move( start, 1 );
-	for( i = start ; i <= end; i++ ){
-		clrtoeol();
-		addch( '\n' );
 	}
 }
